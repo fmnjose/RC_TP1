@@ -12,15 +12,18 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import lib.Stats;
+import sun.nio.cs.ext.PCK;
+
 import static t1.FTP19Packet.*;
 
 
-public class FTP19ClientSW {
+public class FTP19Client {
 
 	static final int FTP19_PORT = 9000;
 
@@ -33,6 +36,7 @@ public class FTP19ClientSW {
 	static int timeout = DEFAULT_TIMEOUT;
 
 	static Stats stats;
+	static Queue<DatagramPacket> sendQueue;
 	static BlockingQueue<FTP19Packet> receiverQueue;
 	static SocketAddress srvAddress;
 
@@ -70,12 +74,12 @@ public class FTP19ClientSW {
 
 
 	/**
-	 * Send a block to the server, repeating until the expected ACK is received (S&W), 
+	 * Send a block with the filename to the server, repeating until the expected ACK is received, 
 	 * or the number of allowed retries is exceeded.
 	 * 
-	 * @return SSeqN from ACK
+	 * @return Server's block size
 	 */
-	static long sendRetry(DatagramSocket socket, FTP19Packet pkt, long expectedACK, int retries) throws Exception {
+	static long sendFilename(DatagramSocket socket, FTP19Packet pkt, long expectedACK, int retries) throws Exception {
 		DatagramPacket dgpkt = pkt.toDatagram(srvAddress);
 		for (int i = 0; i < retries; i++) {
 			long sendTime = System.currentTimeMillis();
@@ -97,7 +101,6 @@ public class FTP19ClientSW {
 		}
 		throw new IOException("sendRetry: too many retries");
 	}
-
 
 	static FTP19Packet buildUploadPacket(String filename) {
 		return new FTP19Packet()
@@ -128,23 +131,43 @@ public class FTP19ClientSW {
 
 			System.out.println("sending file: \"" + filename + "\" to server: " + srvAddress);
 
-			int maxbs = (int)sendRetry(socket, buildUploadPacket(filename), 0L, DEFAULT_MAX_RETRIES);
+			int maxbs = (int)sendFilename(socket, buildUploadPacket(filename), 0L, DEFAULT_MAX_RETRIES);
 			blockSize = Math.min(maxbs,  blockSize);
 			System.out.println("continuing to server: "+srvAddress+" with blocksize: "+blockSize);
 
 			long seqN = 1L; // data block count starts at 1
-			// read and send blocks
-			int n;
 			byte[] buffer = new byte[blockSize];
-			while ((n = f.read(buffer)) > 0) {
-				sendRetry(socket, buildDataPacket(seqN, seqN, buffer, n), seqN, DEFAULT_MAX_RETRIES);
-				seqN += 1;
-				stats.newPacketSent(n);
+			int n;
+			boolean done = false;
+			FTP19Packet pckt;
+			// read and send blocks
+			for(int i = 0; i < windowSize; i++){
+				n = f.read(buffer);
+				pckt = buildDataPacket(seqN, 0L, buffer, n);
+				socket.send(pckt.toDatagram(srvAddress));
+				sendQueue.add(pckt.toDatagram(srvAddress));
+				if(n < blockSize){
+					done = true;
+					break;
+				}
+			}
+
+			for(;;){
+				try{
+				pckt = receiverQueue.poll(timeout, TimeUnit.MILLISECONDS);
+				}catch(InterruptedException e){
+					for(int j = 0; j < sendQueue.size(); j++){
+					pckt = sendQueue.poll();
+					socket.send(pckt.to);
+					sendQueue.add(pckt);
+					}
+
+				}
 			}
 			// send the FIN packet
 			FTP19Packet pk = buildFinPacket(seqN);
 			System.out.println("sending: " + pk);
-			sendRetry(socket, pk, seqN, DEFAULT_MAX_RETRIES);
+			sendFilename(socket, pk, seqN, DEFAULT_MAX_RETRIES);
 
 			System.out.println("transfer finished.");
 			stats.printReport();
@@ -171,7 +194,7 @@ public class FTP19ClientSW {
 					throw new Exception("wrong block size");
 			case 2:
 				break;
-
+				
 			default:
 				throw new Exception("bad parameters");
 			}
