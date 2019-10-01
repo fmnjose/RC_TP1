@@ -18,7 +18,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import lib.Stats;
-import sun.nio.cs.ext.PCK;
 
 import static t1.FTP19Packet.*;
 
@@ -38,6 +37,7 @@ public class FTP19Client {
 	static Stats stats;
 	static Queue<DatagramPacket> sendQueue;
 	static BlockingQueue<FTP19Packet> receiverQueue;
+	static SlidingWindow slidingWindow;
 	static SocketAddress srvAddress;
 
 	/**
@@ -156,11 +156,12 @@ public class FTP19Client {
 				try{
 				pckt = receiverQueue.poll(timeout, TimeUnit.MILLISECONDS);
 				}catch(InterruptedException e){
-					for(int j = 0; j < sendQueue.size(); j++){
+					/*for(int j = 0; j < sendQueue.size(); j++){
 					pckt = sendQueue.poll();
 					socket.send(pckt.to);
 					sendQueue.add(pckt);
-					}
+					}*/
+					break;
 
 				}
 			}
