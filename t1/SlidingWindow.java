@@ -3,6 +3,7 @@ package t1;
 import java.util.LinkedList;
 import java.util.List;
 import java.net.DatagramPacket;
+import java.util.Iterator;
 
 public class SlidingWindow{
     int windowSize;
@@ -18,23 +19,36 @@ public class SlidingWindow{
     }
 
     public void addPacket(DatagramPacket packet){
-        sendingQueue.add(packet);
-        sendingQueue.remove(0);
+        this.sendingQueue.add(packet);
     }
 
-    public DatagramPacket sendPacket(int index){
-        return sendingQueue.get(0);
+    public DatagramPacket getPacket(int index){
+        return sendingQueue.get(index);
     }
 
     public long getPacketNumber(){
         return packetNumber;
     }
 
-    public void incrementWindow(){
-        packetNumber++;
+    public int numberOfPackets(){
+        return this.sendingQueue.size();
     }
 
-    public void restoreWindow(){
-        
+    // para ser usado quando e ack e ha cenas para enviar
+    public void ack(DatagramPacket newPacket){
+        this.sendingQueue.remove(0);
+        this.packetNumber++;
+        this.addPacket(newPacket);
+    }
+
+    //ack quando ja se leu tudo
+    public void ack(){
+        this.sendingQueue.remove(0);
+        this.packetNumber++;
+    }
+
+    //iteradores sao mel
+    public Iterator<DatagramPacket> getPackets(){
+        return this.sendingQueue.iterator();
     }
 }
