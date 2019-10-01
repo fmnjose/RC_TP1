@@ -137,32 +137,41 @@ public class FTP19Client {
 
 			long seqN = 1L; // data block count starts at 1
 			byte[] buffer = new byte[blockSize];
-			int n;
+			int n = 0;
 			boolean done = false;
 			FTP19Packet pckt;
+
+			slidingWindow = new SlidingWindow(windowSize);
 			// read and send blocks
-			for(int i = 0; i < windowSize; i++){
+			for(int i = 0; i < windowSize && !done; i++){
 				n = f.read(buffer);
 				pckt = buildDataPacket(seqN, 0L, buffer, n);
 				socket.send(pckt.toDatagram(srvAddress));
-				sendQueue.add(pckt.toDatagram(srvAddress));
+				slidingWindow.addPacket(pckt.toDatagram(srvAddress));
 				if(n < blockSize){
 					done = true;
 					break;
 				}
 			}
-
+			
 			for(;;){
 				try{
-				pckt = receiverQueue.poll(timeout, TimeUnit.MILLISECONDS);
-				}catch(InterruptedException e){
-					/*for(int j = 0; j < sendQueue.size(); j++){
-					pckt = sendQueue.poll();
-					socket.send(pckt.to);
-					sendQueue.add(pckt);
-					}*/
-					break;
+					pckt = receiverQueue.poll(timeout, TimeUnit.MILLISECONDS);
+					if(pckt.getBytes()[2] == slidingWindow.getPacketNumber()){
+						slidingWindow.incrementWindow();
+						if(n < blockSize)
+							break;
 
+						n = f.read(buffer);
+						pckt = buildDataPacket(seqN,0L,buffer,n);
+						socket.send(pckt.toDatagram(srvAddress));
+						slidingWindow.addPacket(pckt.toDatagram(srvAddress));
+					}
+					else{
+						dumpWindow(socket);
+					}
+				}catch(InterruptedException e){
+					dumpWindow(socket);
 				}
 			}
 			// send the FIN packet
@@ -177,6 +186,17 @@ public class FTP19Client {
 	}
 
 
+	
+	private static void dumpWindow(DatagramSocket socket){
+		try{
+			for (int i = 0;i < windowSize;i++){
+				socket.send(slidingWindow.sendPacket(i));
+			}
+		}catch(IOException e){
+			System.out.println("IOException. Resending window");
+			dumpWindow(socket);
+		}
+	}
 
 	/**** MAIN ****/
 
