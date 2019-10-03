@@ -132,7 +132,6 @@ public class FTP19Client {
 
 			int maxbs = (int)sendFilename(socket, buildUploadPacket(filename), 0L, DEFAULT_MAX_RETRIES);
 			blockSize = Math.min(maxbs,  blockSize);
-			System.out.println("transfer finished.");
 			reliableSend(f, socket);
 			stats.printReport();
 
@@ -169,17 +168,21 @@ public class FTP19Client {
 			for(;!done;){
 				try{
 					packet = receiverQueue.poll(timeout, TimeUnit.MILLISECONDS);
-					if(packet.getBytes()[2] == window.getPacketNumber()){
+					packet.setPosition(2);
+					System.out.println(packet);
+					if(packet.getLong() >= window.getPacketNumber()){
 						if(!done_reading){
 							n = f.read(buffer);
-							seqN++;
 							//se n e 0 entao tempo de enviar o packet do fim
 							if(n == 0){
 								done_reading = true;
 								pckt = buildFinPacket(seqN).toDatagram(srvAddress);
 							}else{
-								pckt = buildDataPacket(seqN,0L,buffer,n).toDatagram(srvAddress);
+								packet = buildDataPacket(seqN,0L,buffer,n);
+								System.out.println(packet);
+								pckt = packet.toDatagram(srvAddress);
 							}
+
 							socket.send(pckt);
 							stats.newPacketSent(n);
 							window.ack(pckt);
@@ -191,6 +194,7 @@ public class FTP19Client {
 							if(window.getPacketNumber() == 0)
 								done = true;
 						}
+						seqN++;
 					}
 					else{
 						dumpWindow(socket);
@@ -208,9 +212,13 @@ public class FTP19Client {
 	
 	private static void dumpWindow(DatagramSocket socket){
 		try{
+			System.out.println("DUMP");
 			Iterator<DatagramPacket> itera = window.getPackets();
-			while(itera.hasNext())
-				socket.send(itera.next());
+			while(itera.hasNext()){
+				DatagramPacket p = itera.next();
+				System.out.println("DATAGRAM NUMBER: " + (byte)p.getData()[9]);
+				socket.send(p);
+			}
 		}catch(IOException e){
 			System.out.println("IOException. Resending window");
 			dumpWindow(socket);

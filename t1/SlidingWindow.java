@@ -9,13 +9,11 @@ public class SlidingWindow{
     int windowSize;
     long packetNumber;
     List<DatagramPacket> sendingQueue;
-    List<DatagramPacket> sentQueue;
 
     public SlidingWindow(int windowSize){
         packetNumber = 1;
         this.windowSize = windowSize;
         sendingQueue = new LinkedList<>();
-        sentQueue = new LinkedList<>();
     }
 
     public void addPacket(DatagramPacket packet){
