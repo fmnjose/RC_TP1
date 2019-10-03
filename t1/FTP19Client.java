@@ -168,9 +168,18 @@ public class FTP19Client {
 			for(;!done;){
 				try{
 					packet = receiverQueue.poll(timeout, TimeUnit.MILLISECONDS);
+
 					packet.setPosition(2);
-					System.out.println(packet);
-					if(packet.getLong() >= window.getPacketNumber()){
+					if(packet.getLong() < window.getPacketNumber()){
+						dumpWindow(socket);
+					}
+					System.out.println("Entrei no for");
+
+					packet.setPosition(2);
+					while(packet.getLong() >= window.getPacketNumber()){
+						packet.setPosition(2);
+						System.out.println("PACKET NUMBER: " + packet.getLong() + "||||| WINDOW NUMBER: " + window.getPacketNumber());
+
 						if(!done_reading){
 							n = f.read(buffer);
 							//se n e 0 entao tempo de enviar o packet do fim
@@ -178,9 +187,7 @@ public class FTP19Client {
 								done_reading = true;
 								pckt = buildFinPacket(seqN).toDatagram(srvAddress);
 							}else{
-								packet = buildDataPacket(seqN,0L,buffer,n);
-								System.out.println(packet);
-								pckt = packet.toDatagram(srvAddress);
+								pckt = buildDataPacket(seqN,0L,buffer,n).toDatagram(srvAddress);
 							}
 
 							socket.send(pckt);
@@ -195,9 +202,7 @@ public class FTP19Client {
 								done = true;
 						}
 						seqN++;
-					}
-					else{
-						dumpWindow(socket);
+						packet.setPosition(2);
 					}
 				}catch(InterruptedException e){
 					dumpWindow(socket);
@@ -208,7 +213,7 @@ public class FTP19Client {
 		}
 	}
 
-
+	private static void sendNext(){}
 	
 	private static void dumpWindow(DatagramSocket socket){
 		try{
