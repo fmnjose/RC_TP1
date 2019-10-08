@@ -157,6 +157,7 @@ public class FTP19Client {
 				pckt = buildDataPacket(seqN, 0L, buffer, n).toDatagram(srvAddress);
 				seqN ++;
 				socket.send(pckt);
+				stats.newPacketSent(n);
 				window.addPacket(pckt);
 				if(n < blockSize){
 					done_reading = true;
@@ -173,33 +174,34 @@ public class FTP19Client {
 					if(packet.getLong() < window.getPacketNumber()){
 						dumpWindow(socket);
 					}
-					System.out.println("Entrei no for");
 
 					packet.setPosition(2);
 					while(packet.getLong() >= window.getPacketNumber()){
 						packet.setPosition(2);
 						System.out.println("PACKET NUMBER: " + packet.getLong() + "||||| WINDOW NUMBER: " + window.getPacketNumber());
-
+						
 						if(!done_reading){
 							n = f.read(buffer);
 							//se n e 0 entao tempo de enviar o packet do fim
-							if(n == 0){
+							if(n == -1){
 								done_reading = true;
 								pckt = buildFinPacket(seqN).toDatagram(srvAddress);
+								stats.newPacketSent(0);
 							}else{
 								pckt = buildDataPacket(seqN,0L,buffer,n).toDatagram(srvAddress);
+								stats.newPacketSent(n);
 							}
 
 							socket.send(pckt);
-							stats.newPacketSent(n);
 							window.ack(pckt);
 						//se ja acabou de ler e so fazer acks sem adicionar ficheiros
 						//just smile and wave boys
 						}else{
 							window.ack();
 							//se ja nao ha nada para levar ack, were done lads
-							if(window.getPacketNumber() == 0)
+							if(window.getNumberOfPackets() == 0)
 								done = true;
+							
 						}
 						seqN++;
 						packet.setPosition(2);

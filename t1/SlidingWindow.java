@@ -24,11 +24,20 @@ public class SlidingWindow{
         return sendingQueue.get(index);
     }
 
+
+    /**
+     * 
+     * @return Lowest packet number
+     */
     public long getPacketNumber(){
         return packetNumber;
     }
 
-    public int numberOfPackets(){
+    /**
+     *
+     * @return Number of packets in the window
+     */
+    public int getNumberOfPackets(){
         return this.sendingQueue.size();
     }
 
