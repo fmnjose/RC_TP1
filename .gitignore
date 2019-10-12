@@ -1,2 +1,6 @@
 *.class
 server.jar
+file1024B
+file1460B
+*.jpg
+*.copy

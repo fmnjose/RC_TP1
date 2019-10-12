@@ -6,30 +6,62 @@ import java.net.DatagramPacket;
 import java.util.Iterator;
 
 public class SlidingWindow{
-    int windowSize;
-    long packetNumber;
-    List<DatagramPacket> sendingQueue;
+    private int windowSize;
+    private long packetNumber;
+    private List<DatagramPacket> sendingQueue;
+    private int index;
+    private long resendTrigger; //sseq do pacote que despoletou o resend
+
 
     public SlidingWindow(int windowSize){
-        packetNumber = 1;
+        this.packetNumber = 1;
+        this.index = -1;
         this.windowSize = windowSize;
         sendingQueue = new LinkedList<>();
+        this.resendTrigger = -1L;
     }
 
-    public void addPacket(DatagramPacket packet){
+    public synchronized void addPacket(DatagramPacket packet){
         this.sendingQueue.add(packet);
+        if(index < windowSize - 1)
+            index++;
+        
     }
 
-    public DatagramPacket getPacket(int index){
+    public synchronized DatagramPacket getPacket(){
         return sendingQueue.get(index);
     }
 
+    public synchronized void resetIndex(long sseq){
+        index = -1;
 
+        if(resendTrigger == -1)
+            resendTrigger = sseq;
+    }
+
+    public synchronized void removeHead(){
+        sendingQueue.remove(0);
+        packetNumber++;
+
+        resendTrigger = -1L;
+    }
+
+    public synchronized void incrementIndex(){
+        index++;
+    }
+
+    public synchronized int getCurrentIndex(){
+        return index;
+    }
+
+    public synchronized int getCurrentWindowSize(){
+        return windowSize;
+    }
     /**
      * 
      * @return Lowest packet number
      */
-    public long getPacketNumber(){
+    public synchronized long getPacketNumber(){
         return packetNumber;
     }
 
@@ -37,25 +69,15 @@ public class SlidingWindow{
      *
      * @return Number of packets in the window
      */
-    public int getNumberOfPackets(){
+    public synchronized int getNumberOfPackets(){
         return this.sendingQueue.size();
     }
 
-    // para ser usado quando e ack e ha cenas para enviar
-    public void ack(DatagramPacket newPacket){
-        this.sendingQueue.remove(0);
-        this.packetNumber++;
-        this.addPacket(newPacket);
+    public synchronized boolean hasSpace(){
+        return this.sendingQueue.size() < windowSize;
     }
 
-    //ack quando ja se leu tudo
-    public void ack(){
-        this.sendingQueue.remove(0);
-        this.packetNumber++;
-    }
-
-    //iteradores sao mel
-    public Iterator<DatagramPacket> getPackets(){
-        return this.sendingQueue.iterator();
+    public synchronized long getResendTrigger(){
+        return resendTrigger;
     }
 }
