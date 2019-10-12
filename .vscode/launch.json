@@ -1,0 +1,12 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "CodeLens (Launch) - FTP19Client",
+            "request": "launch",
+            "mainClass": "t1.FTP19Client",
+            "projectName": "RC_TP1_f942f6f4",
+            "args" : "file1024B localhost 1024 3"
+        }
+    ]
+}

@@ -42,7 +42,7 @@ public class SlidingWindow{
     public synchronized void removeHead(){
         sendingQueue.remove(0);
         packetNumber++;
-
+        index--;
         resendTrigger = -1L;
     }
 
