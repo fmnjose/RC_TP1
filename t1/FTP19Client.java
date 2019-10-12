@@ -244,12 +244,7 @@ public class FTP19Client {
 
 				} else if (window.getNumberOfPackets() != 0) {
 
-					if (!doneReading)
-						maxIndex = window.getCurrentWindowSize() - 1;
-					else
-						maxIndex = window.getNumberOfPackets() - 1;
-
-					while (window.getCurrentIndex() < maxIndex) {
+					while (window.getCurrentIndex() < window.getMaxIndex(doneReading)) {
 						window.incrementIndex();
 						socket.send(window.getPacket());
 						System.out
@@ -264,6 +259,7 @@ public class FTP19Client {
 		}
 
 		try {
+			System.out.println("Bom dia");
 			pckt = buildFinPacket(seqN).toDatagram(srvAddress);
 			window.addPacket(pckt);
 

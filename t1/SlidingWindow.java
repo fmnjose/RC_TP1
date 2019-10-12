@@ -80,4 +80,11 @@ public class SlidingWindow{
     public synchronized long getResendTrigger(){
         return resendTrigger;
     }
+
+    public synchronized int getMaxIndex(boolean doneReading){
+        if (!doneReading)
+			return this.windowSize - 1;
+		else
+			return this.sendingQueue.size() - 1;
+    }
 }
