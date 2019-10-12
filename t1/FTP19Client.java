@@ -76,7 +76,9 @@ public class FTP19Client {
 	}
 
 	static class PollingThread implements Runnable {
+
 		PollingThread() {
+
 		}
 
 		public void run() {
@@ -88,7 +90,6 @@ public class FTP19Client {
 						window.resetIndex(0L);
 					} else {
 						System.out.println(ack);
-						;
 						ack.setPosition(2);
 						long cpckN = ack.getLong();
 						long spckN = ack.getLong();
@@ -102,6 +103,8 @@ public class FTP19Client {
 					}
 				} catch (InterruptedException e) {
 					System.out.println(e.getStackTrace());
+				}catch(IllegalMonitorStateException e){
+					System.out.println("Epa ya");
 				}
 
 			}
@@ -216,13 +219,12 @@ public class FTP19Client {
 	private static void reliableSend(FileInputStream f, DatagramSocket socket) {
 		byte buffer[] = new byte[blockSize];
 		int n;
-		FTP19Packet packet;
 		DatagramPacket pckt;
 		long seqN = 1L;
-		int maxIndex;
 		boolean doneReading = false;
 
-		new Thread(new PollingThread()).start();
+		Thread thread = new Thread(new PollingThread());
+		thread.start();
 
 		for (;;) {
 			try {
@@ -247,8 +249,7 @@ public class FTP19Client {
 					while (window.getCurrentIndex() < window.getMaxIndex(doneReading)) {
 						window.incrementIndex();
 						socket.send(window.getPacket());
-						System.out
-								.println("Sent packet: " + (int) (window.getPacketNumber() + window.getCurrentIndex()));
+						System.out.println("Sent packet: " + (int) (window.getPacketNumber() + window.getCurrentIndex()));
 					}
 				} else
 					break;
@@ -259,14 +260,12 @@ public class FTP19Client {
 		}
 
 		try {
-			System.out.println("Bom dia");
 			pckt = buildFinPacket(seqN).toDatagram(srvAddress);
 			window.addPacket(pckt);
+			socket.send(pckt);
+			System.out.println("FIN packet has seqN " + seqN);
 
-			while (window.getCurrentIndex() != window.getNumberOfPackets() - 1) {
-				window.incrementIndex();
-				socket.send(window.getPacket());
-			}
+			thread.stop();
 		} catch (IOException e) {
 			System.out.println(e.getStackTrace());
 		}
@@ -306,7 +305,6 @@ public class FTP19Client {
 			String filename = args[0];
 			srvAddress = new InetSocketAddress(InetAddress.getByName(args[1]), FTP19_PORT);
 			sendFile(filename);
-
 		} catch (IOException x) {
 			System.err.println(x);
 			System.exit(1);
@@ -318,5 +316,4 @@ public class FTP19Client {
 			System.exit(1);
 		}
 	}
-
 }

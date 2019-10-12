@@ -2,11 +2,19 @@
     "configurations": [
         {
             "type": "java",
+            "name": "CodeLens (Launch) - FTP19ClientSW",
+            "request": "launch",
+            "mainClass": "t1.FTP19ClientSW",
+            "projectName": "RC_f624dd0f",
+            "args": "ric.png localhost 1024 3"
+        },
+        {
+            "type": "java",
             "name": "CodeLens (Launch) - FTP19Client",
             "request": "launch",
             "mainClass": "t1.FTP19Client",
-            "projectName": "RC_TP1_f942f6f4",
-            "args" : "file1024B localhost 1024 3"
+            "projectName": "RC_f624dd0f",
+            "args": "ric.png localhost 1024 3"
         }
     ]
 }

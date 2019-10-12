@@ -82,9 +82,6 @@ public class SlidingWindow{
     }
 
     public synchronized int getMaxIndex(boolean doneReading){
-        if (!doneReading)
-			return this.windowSize - 1;
-		else
-			return this.sendingQueue.size() - 1;
+		return this.sendingQueue.size() - 1;
     }
 }
