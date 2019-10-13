@@ -174,48 +174,6 @@ public class FTP19Client {
 		}
 	}
 
-	// Pus em metodo a parte para ser mais digerivel (menos feio)
-	/*
-	 * private static void reliableSend(FileInputStream f, DatagramSocket socket){
-	 * byte[] buffer = new byte[blockSize]; int n; boolean done_reading = false,
-	 * done = false; FTP19Packet packet; DatagramPacket pckt; long seqN = 1L; //
-	 * data block count starts at 1
-	 * 
-	 * //sliding window ca dentro porque nao faz sentido nao estar window = new
-	 * SlidingWindow(windowSize);
-	 * 
-	 * //Sending the first <window_size> packets try{ for(int i = 0; i < windowSize;
-	 * i++){ n = f.read(buffer); pckt = buildDataPacket(seqN, 0L, buffer,
-	 * n).toDatagram(srvAddress); seqN ++; socket.send(pckt);
-	 * stats.newPacketSent(n); window.addPacket(pckt); if(n < blockSize){
-	 * done_reading = true; break; } }
-	 * 
-	 * //Loops until done for(;!done;){ try{ packet = receiverQueue.poll(timeout,
-	 * TimeUnit.MILLISECONDS);
-	 * 
-	 * packet.setPosition(2); if(packet.getLong() < window.getPacketNumber()){
-	 * dumpWindow(socket); }
-	 * 
-	 * packet.setPosition(2); while(packet.getLong() >= window.getPacketNumber()){
-	 * packet.setPosition(2); System.out.println("PACKET NUMBER: " +
-	 * packet.getLong() + "||||| WINDOW NUMBER: " + window.getPacketNumber());
-	 * 
-	 * if(!done_reading){ n = f.read(buffer); //se n e 0 entao tempo de enviar o
-	 * packet do fim if(n == -1){ done_reading = true; pckt =
-	 * buildFinPacket(seqN).toDatagram(srvAddress); stats.newPacketSent(0); }else{
-	 * pckt = buildDataPacket(seqN,0L,buffer,n).toDatagram(srvAddress);
-	 * stats.newPacketSent(n); }
-	 * 
-	 * socket.send(pckt); window.ack(pckt); //se ja acabou de ler e so fazer acks
-	 * sem adicionar ficheiros //just smile and wave boys }else{ window.ack(); //se
-	 * ja nao ha nada para levar ack, were done lads if(window.getNumberOfPackets()
-	 * == 0) done = true;
-	 * 
-	 * } seqN++; packet.setPosition(2); } }catch(InterruptedException e){
-	 * dumpWindow(socket); } } }catch(IOException e){
-	 * System.err.println("IOException during send"); } }
-	 */
-
 	private static void reliableSend(FileInputStream f, DatagramSocket socket) {
 		byte buffer[] = new byte[blockSize];
 		int n;
@@ -251,8 +209,9 @@ public class FTP19Client {
 						socket.send(window.getPacket());
 						System.out.println("Sent packet: " + (int) (window.getPacketNumber() + window.getCurrentIndex()));
 					}
-				} else
+				} else if(doneReading){
 					break;
+				}
 
 			} catch (IOException e) {
 				System.out.println(e.getStackTrace());
@@ -265,20 +224,13 @@ public class FTP19Client {
 			socket.send(pckt);
 			System.out.println("FIN packet has seqN " + seqN);
 
-			thread.stop();
+			thread.join(10);
 		} catch (IOException e) {
+			System.out.println(e.getStackTrace());
+		}catch(InterruptedException e){
 			System.out.println(e.getStackTrace());
 		}
 	}
-
-	/*
-	 * private static void dumpWindow(DatagramSocket socket) { try {
-	 * System.out.println("DUMP"); Iterator<DatagramPacket> itera =
-	 * window.getPackets(); while (itera.hasNext()) { DatagramPacket p =
-	 * itera.next(); System.out.println("DATAGRAM NUMBER: " + (byte)
-	 * p.getData()[9]); socket.send(p); } } catch (IOException e) {
-	 * System.out.println("IOException. Resending window"); dumpWindow(socket); } }
-	 */
 
 	/**** MAIN ****/
 		
