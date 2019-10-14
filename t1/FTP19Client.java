@@ -27,7 +27,7 @@ public class FTP19Client {
 
 	static final int FTP19_PORT = 9000;
 
-	static final int DEFAULT_TIMEOUT = 500;
+	static final int DEFAULT_TIMEOUT = 100;
 	static final int DEFAULT_MAX_RETRIES = 5;
 	private static final int DEFAULT_BLOCK_SIZE = 8 * 1024;
 
@@ -40,7 +40,7 @@ public class FTP19Client {
 	static BlockingQueue<FTP19Packet> receiverQueue;
 	static SocketAddress srvAddress;
 
-	static Semaphore semaphore = new Semaphore(1);
+	static boolean done = false;
 
 	/**
 	 * Receiver thread so that ACKs from server can be received by this at the same
@@ -69,6 +69,7 @@ public class FTP19Client {
 					FTP19Packet pkt = new FTP19Packet(msg.getData(), msg.getLength());
 					receiverQueue.put(pkt);
 				}
+
 			} catch (Exception e) {
 				System.out.println("Receiver done.");
 			}
@@ -101,6 +102,9 @@ public class FTP19Client {
 							for (; cpckN >= window.getPacketNumber(); window.removeHead());
 
 					}
+
+					if(done && window.getNumberOfPackets() == 0)
+						break;
 				} catch (InterruptedException e) {
 					System.out.println(e.getStackTrace());
 				}catch(IllegalMonitorStateException e){
@@ -117,7 +121,7 @@ public class FTP19Client {
 	 * 
 	 * @return Server's block size
 	 */
-	static long sendFilename(DatagramSocket socket, FTP19Packet pkt, long expectedACK, int retries) throws Exception {
+	static long sendRetry(DatagramSocket socket, FTP19Packet pkt, long expectedACK, int retries) throws Exception {
 		DatagramPacket dgpkt = pkt.toDatagram(srvAddress);
 		for (int i = 0; i < retries; i++) {
 			long sendTime = System.currentTimeMillis();
@@ -164,11 +168,16 @@ public class FTP19Client {
 			// start a receiver process to feed the queue
 			window = new SlidingWindow(windowSize);
 
-			new Thread(new Receiver(socket)).start();
+			Thread receiver = new Thread(new Receiver(socket));
+			receiver.start();
 
-			int maxbs = (int) sendFilename(socket, buildUploadPacket(filename), 0L, DEFAULT_MAX_RETRIES);
+			int maxbs = (int) sendRetry(socket, buildUploadPacket(filename), 0L, DEFAULT_MAX_RETRIES);
 			blockSize = Math.min(maxbs, blockSize);
 			reliableSend(f, socket);
+			System.out.println("Gonna wait for thread");
+			receiver.join();
+			System.out.println("thread done");
+			socket.close();
 			stats.printReport();
 
 		}
@@ -202,7 +211,17 @@ public class FTP19Client {
 						System.out.println("n menor que blocksize");
 					}
 
-				} else if (window.getNumberOfPackets() != 0) {
+				}else if(window.hasSpace() && doneReading && !done){
+					pckt = buildFinPacket(seqN).toDatagram(srvAddress);
+			
+					window.addPacket(pckt);
+					socket.send(pckt);
+					System.out.println("FIN packet has seqN " + seqN);
+
+					done = true;
+
+				} 
+				else if (window.getNumberOfPackets() != 0) {
 
 					while (window.getCurrentIndex() < window.getMaxIndex(doneReading)) {
 						window.incrementIndex();
@@ -210,6 +229,7 @@ public class FTP19Client {
 						System.out.println("Sent packet: " + (int) (window.getPacketNumber() + window.getCurrentIndex()));
 					}
 				} else if(doneReading){
+
 					break;
 				}
 
@@ -218,18 +238,7 @@ public class FTP19Client {
 			}
 		}
 
-		try {
-			pckt = buildFinPacket(seqN).toDatagram(srvAddress);
-			window.addPacket(pckt);
-			socket.send(pckt);
-			System.out.println("FIN packet has seqN " + seqN);
-
-			thread.join(10);
-		} catch (IOException e) {
-			System.out.println(e.getStackTrace());
-		}catch(InterruptedException e){
-			System.out.println(e.getStackTrace());
-		}
+		
 	}
 
 	/**** MAIN ****/
