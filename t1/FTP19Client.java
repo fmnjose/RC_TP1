@@ -11,6 +11,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.net.SocketTimeoutException;
 import java.util.Iterator;
 import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -61,6 +62,8 @@ public class FTP19Client {
 				for (;;) {
 					byte[] buffer = new byte[MAX_FTP19_PACKET_SIZE];
 					DatagramPacket msg = new DatagramPacket(buffer, buffer.length);
+					if(done && window.getNumberOfPackets() == 1)
+						break;
 					socket.receive(msg);
 					// update server address (it changes when the reply to UPLOAD
 					// comes from a different port)
@@ -69,6 +72,8 @@ public class FTP19Client {
 					FTP19Packet pkt = new FTP19Packet(msg.getData(), msg.getLength());
 					receiverQueue.put(pkt);
 				}
+
+				System.out.println("Receiver done");
 
 			} catch (Exception e) {
 				System.out.println("Receiver done.");
@@ -174,10 +179,7 @@ public class FTP19Client {
 			int maxbs = (int) sendRetry(socket, buildUploadPacket(filename), 0L, DEFAULT_MAX_RETRIES);
 			blockSize = Math.min(maxbs, blockSize);
 			reliableSend(f, socket);
-			System.out.println("Gonna wait for thread");
 			receiver.join();
-			System.out.println("thread done");
-			socket.close();
 			stats.printReport();
 
 		}
@@ -196,7 +198,6 @@ public class FTP19Client {
 		for (;;) {
 			try {
 				if (window.hasSpace() && !doneReading) {
-					System.out.println("Ola bom dia");
 					n = f.read(buffer);
 					if (n != -1) {
 						pckt = buildDataPacket(seqN, 0L, buffer, n).toDatagram(srvAddress);
@@ -204,6 +205,7 @@ public class FTP19Client {
 						socket.send(pckt);
 						System.out.println("Sent new packet : " + seqN);
 						seqN++;
+						stats.newPacketSent(n);
 					}
 
 					if (n < blockSize) {
@@ -217,6 +219,7 @@ public class FTP19Client {
 					window.addPacket(pckt);
 					socket.send(pckt);
 					System.out.println("FIN packet has seqN " + seqN);
+					stats.newPacketSent(0);
 
 					done = true;
 
@@ -226,7 +229,6 @@ public class FTP19Client {
 					while (window.getCurrentIndex() < window.getMaxIndex(doneReading)) {
 						window.incrementIndex();
 						socket.send(window.getPacket());
-						System.out.println("Sent packet: " + (int) (window.getPacketNumber() + window.getCurrentIndex()));
 					}
 				} else if(doneReading){
 
