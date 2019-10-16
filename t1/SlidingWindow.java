@@ -6,45 +6,41 @@ import java.net.DatagramPacket;
 import java.util.Iterator;
 
 public class SlidingWindow{
-    private int windowSize;
-    private long packetNumber;
     private List<DatagramPacket> sendingQueue;
     private int index;
-    private long resendTrigger; //sseq do pacote que despoletou o resend
+    private int windowSize;
+    private long lastCSeq;
+    private long lastSSeq;
 
 
     public SlidingWindow(int windowSize){
-        this.packetNumber = 1;
+        this.lastCSeq = 1;
         this.index = -1;
         this.windowSize = windowSize;
         sendingQueue = new LinkedList<>();
-        this.resendTrigger = -1L;
     }
 
     public synchronized void addPacket(DatagramPacket packet){
-        this.sendingQueue.add(packet);
-        if(index < windowSize - 1)
-            index++;
-        
+        this.sendingQueue.add(packet);        
     }
 
     public synchronized DatagramPacket getPacket(){
         return sendingQueue.get(index);
     }
 
-    public synchronized void resetIndex(long sseq){
-        index = -1;
+    public synchronized void resetIndex(long initialIndex,long sseq){
+        if(sseq == -1)
+            lastSSeq = this.lastCSeq + sendingQueue.size() + 1;
+        else
+            lastSSeq = sseq;
 
-        if(resendTrigger == -1)
-            resendTrigger = sseq;
+        this.index = (int)(initialIndex % windowSize);
+
     }
 
     public synchronized void removeHead(){
         sendingQueue.remove(0);
-        packetNumber++;
-        if(index != -1)
-            index--;
-        resendTrigger = -1L;
+        lastCSeq++;
     }
 
     public synchronized void incrementIndex(){
@@ -62,10 +58,13 @@ public class SlidingWindow{
      * 
      * @return Lowest packet number
      */
-    public synchronized long getPacketNumber(){
-        return packetNumber;
+    public synchronized long getLastCSeq(){
+        return this.lastCSeq;
     }
 
+    public synchronized long getLastSSeq(){
+        return this.lastSSeq;
+    }
     /**
      *
      * @return Number of packets in the window
@@ -78,11 +77,7 @@ public class SlidingWindow{
         return this.sendingQueue.size() < windowSize;
     }
 
-    public synchronized long getResendTrigger(){
-        return resendTrigger;
-    }
-
-    public synchronized int getMaxIndex(boolean doneReading){
+    public synchronized int getMaxIndex(){
 		return this.sendingQueue.size() - 1;
     }
 }

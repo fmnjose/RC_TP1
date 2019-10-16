@@ -93,19 +93,21 @@ public class FTP19Client {
 					FTP19Packet ack = receiverQueue.poll(timeout, TimeUnit.MILLISECONDS);
 
 					if (ack == null) {
-						window.resetIndex(0L);
+						window.resetIndex(window.getLastCSeq(),-1L);
 					} else {
 						System.out.println(ack);
 						ack.setPosition(2);
 						long cpckN = ack.getLong();
 						long spckN = ack.getLong();
 
-						if (cpckN < window.getPacketNumber() && window.getResendTrigger() != -1
-								&& spckN == window.getResendTrigger())
-							window.resetIndex(spckN);
-						else
-							for (; cpckN >= window.getPacketNumber(); window.removeHead());
+						for(;cpckN >= window.getLastCSeq(); window.removeHead());
 
+						if(spckN > cpckN){
+							if(spckN > window.getLastSSeq() + 1)
+								window.resetIndex(window.getLastSSeq(),spckN);
+							else
+								window.resetIndex(window.getLastCSeq(), spckN);
+						}
 					}
 
 					if(done && window.getNumberOfPackets() == 0)
@@ -226,9 +228,9 @@ public class FTP19Client {
 				} 
 				else if (window.getNumberOfPackets() != 0) {
 
-					while (window.getCurrentIndex() < window.getMaxIndex(doneReading)) {
-						window.incrementIndex();
+					while (window.getCurrentIndex() < window.getLastSSeq() % (long)window.getCurrentWindowSize()) {
 						socket.send(window.getPacket());
+						window.incrementIndex();
 					}
 				} else if(doneReading){
 
