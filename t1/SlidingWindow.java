@@ -16,7 +16,7 @@ public class SlidingWindow{
 
     public SlidingWindow(int windowSize){
         this.lastCSeq = 1;
-        this.lastSSeq = 0;
+        this.lastSSeq = -1;
         this.index = 0;
         this.windowSize = windowSize;
         this.sendingQueue = new LinkedList<>();
@@ -37,11 +37,12 @@ public class SlidingWindow{
     }
 
     public void setSSeq(long sseq){
-        if(this.lastSSeq == -1L)
+       if(this.lastSSeq == -1L)
             this.index = 0;
-        else
+        else if(sseq > this.lastSSeq + 1)
             this.index = (int)(this.lastSSeq - this.lastCSeq);
-        
+        else
+            this.index += 1;
         this.lastSSeq = sseq;
         
         

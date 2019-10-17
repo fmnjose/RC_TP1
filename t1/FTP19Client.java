@@ -28,7 +28,7 @@ public class FTP19Client {
 
 	static final int FTP19_PORT = 9000;
 
-	static final int DEFAULT_TIMEOUT = 1000;
+	static final int DEFAULT_TIMEOUT = 600;
 	static final int DEFAULT_MAX_RETRIES = 5;
 	private static final int DEFAULT_BLOCK_SIZE = 8 * 1024;
 
@@ -176,20 +176,31 @@ public class FTP19Client {
 				
 				FTP19Packet ack = receiverQueue.poll();
 				
-				if(ack == null && 
-					System.currentTimeMillis() - window.getSendTime() > timeout)
-					window.setSSeq(0);
+				if(ack == null){
+					if(System.currentTimeMillis() - window.getSendTime() > timeout
+						&& window.getLastSSeq() != (window.getLastCSeq() + window.getCurrentWindowSize())){
+						window.setSSeq(0);
+						System.out.println(ack);
+					}
+					
+				}
 				else{
 					ack.setPosition(2);
 					long cpckN = ack.getLong();
 					long spckN = ack.getLong();
 
+					System.out.println(ack);
+
 					for(;cpckN >= window.getLastCSeq(); window.removeHead());
 
 					if(spckN > cpckN){
-							if(spckN > window.getLastSSeq() + 1){
+							//if(spckN > window.getLastSSeq() + 1){
+								System.out.println("LAST SSEQ: " + window.getLastSSeq());
 								window.setSSeq(spckN);
-							}
+								System.out.println("INDEX: " + window.getCurrentIndex());
+								System.out.println("NEW SSEQ : " + window.getLastSSeq());
+
+							//}
 						}
 
 				}
@@ -215,6 +226,8 @@ public class FTP19Client {
 
 			} catch (IOException e) {
 				System.out.println(e.getStackTrace());
+			} catch (NullPointerException e){
+				System.out.println("pila");
 			}
 		}
 
