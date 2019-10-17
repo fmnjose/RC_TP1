@@ -29,6 +29,8 @@ public class SlidingWindow{
     }
 
     public DatagramPacket getPacket(){
+        sendingTimes.remove(0);
+        sendingTimes.add(System.currentTimeMillis());
         return sendingQueue.get(index);
     }
 
@@ -37,19 +39,23 @@ public class SlidingWindow{
     }
 
     public void setSSeq(long sseq){
-       if(this.lastSSeq == -1L)
+       if (sseq == 0){
+            this.index = 0;
+            this.lastSSeq = this.lastCSeq + this.windowSize;
+        }
+        else{
+        if(this.lastSSeq == -1L)
             this.index = 0;
         else if(sseq > this.lastSSeq + 1)
-            this.index = (int)(this.lastSSeq - this.lastCSeq);
-        else
-            this.index += 1;
-        this.lastSSeq = sseq;
-        
-        
-        if (sseq == 0){
-            this.lastSSeq = this.lastCSeq + this.windowSize;
-            this.index = 0;  
+            this.index = (int)(this.lastSSeq + 1 - this.lastCSeq);
+        else 
+            this.index++;
+
+            this.lastSSeq = sseq;
         }
+        
+        
+        
     }
 
     public void removeHead(){

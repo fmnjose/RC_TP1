@@ -178,9 +178,12 @@ public class FTP19Client {
 				
 				if(ack == null){
 					if(System.currentTimeMillis() - window.getSendTime() > timeout
-						&& window.getLastSSeq() != (window.getLastCSeq() + window.getCurrentWindowSize())){
-						window.setSSeq(0);
+					/*&& window.getLastSSeq() != window.getLastCSeq() + window.getCurrentWindowSize() - 1 */){
 						System.out.println(ack);
+						System.out.println("[NULL] LAST CSEQ : " + window.getLastCSeq());
+						System.out.println("[NULL] LAST SSEQ : " + window.getLastSSeq());
+						window.setSSeq(0);
+						System.out.println("[NULL] LAST SSEQ : " + window.getLastSSeq());
 					}
 					
 				}
