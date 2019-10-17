@@ -28,7 +28,7 @@ public class FTP19Client {
 
 	static final int FTP19_PORT = 9000;
 
-	static final int DEFAULT_TIMEOUT = 100;
+	static final int DEFAULT_TIMEOUT = 1000;
 	static final int DEFAULT_MAX_RETRIES = 5;
 	private static final int DEFAULT_BLOCK_SIZE = 8 * 1024;
 
@@ -77,47 +77,6 @@ public class FTP19Client {
 
 			} catch (Exception e) {
 				System.out.println("Receiver done.");
-			}
-		}
-	}
-
-	static class PollingThread implements Runnable {
-
-		PollingThread() {
-
-		}
-
-		public void run() {
-			for (;;) {
-				try {
-					FTP19Packet ack = receiverQueue.poll(timeout, TimeUnit.MILLISECONDS);
-
-					if (ack == null) {
-						window.resetIndex(window.getLastCSeq(),-1L);
-					} else {
-						System.out.println(ack);
-						ack.setPosition(2);
-						long cpckN = ack.getLong();
-						long spckN = ack.getLong();
-
-						for(;cpckN >= window.getLastCSeq(); window.removeHead());
-
-						if(spckN > cpckN){
-							if(spckN > window.getLastSSeq() + 1)
-								window.resetIndex(window.getLastSSeq(),spckN);
-							else
-								window.resetIndex(window.getLastCSeq(), spckN);
-						}
-					}
-
-					if(done && window.getNumberOfPackets() == 0)
-						break;
-				} catch (InterruptedException e) {
-					System.out.println(e.getStackTrace());
-				}catch(IllegalMonitorStateException e){
-					System.out.println("Epa ya");
-				}
-
 			}
 		}
 	}
@@ -194,12 +153,10 @@ public class FTP19Client {
 		long seqN = 1L;
 		boolean doneReading = false;
 
-		Thread thread = new Thread(new PollingThread());
-		thread.start();
-
 		for (;;) {
 			try {
-				if (window.hasSpace() && !doneReading) {
+
+				if(window.hasSpace() && !doneReading){
 					n = f.read(buffer);
 					if (n != -1) {
 						pckt = buildDataPacket(seqN, 0L, buffer, n).toDatagram(srvAddress);
@@ -210,32 +167,51 @@ public class FTP19Client {
 						stats.newPacketSent(n);
 					}
 
-					if (n < blockSize) {
+					if (n < blockSize)
 						doneReading = true;
-						System.out.println("n menor que blocksize");
-					}
+					
+					
+				}
+				
+				
+				FTP19Packet ack = receiverQueue.poll();
+				
+				if(ack == null && 
+					System.currentTimeMillis() - window.getSendTime() > timeout)
+					window.setSSeq(0);
+				else{
+					ack.setPosition(2);
+					long cpckN = ack.getLong();
+					long spckN = ack.getLong();
 
+					for(;cpckN >= window.getLastCSeq(); window.removeHead());
+
+					if(spckN > cpckN){
+							if(spckN > window.getLastSSeq() + 1){
+								window.setSSeq(spckN);
+							}
+						}
+
+				}
+
+				if (window.getNumberOfPackets() != 0) {
+					while (window.getCurrentIndex() < (window.getLastSSeq() - window.getLastCSeq())) {						
+						System.out.println("Resent packet: " + (window.getLastCSeq() + window.getCurrentIndex()));
+						socket.send(window.getPacket());
+						window.incrementIndex();
+					}
 				}else if(window.hasSpace() && doneReading && !done){
 					pckt = buildFinPacket(seqN).toDatagram(srvAddress);
-			
+					
 					window.addPacket(pckt);
 					socket.send(pckt);
 					System.out.println("FIN packet has seqN " + seqN);
 					stats.newPacketSent(0);
-
+					
 					done = true;
-
-				} 
-				else if (window.getNumberOfPackets() != 0) {
-
-					while (window.getCurrentIndex() < window.getLastSSeq() % (long)window.getCurrentWindowSize()) {
-						socket.send(window.getPacket());
-						window.incrementIndex();
-					}
-				} else if(doneReading){
-
+					
+				}else if(doneReading)					
 					break;
-				}
 
 			} catch (IOException e) {
 				System.out.println(e.getStackTrace());
