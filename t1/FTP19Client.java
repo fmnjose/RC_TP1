@@ -28,7 +28,7 @@ public class FTP19Client {
 
 	static final int FTP19_PORT = 9000;
 
-	static final int DEFAULT_TIMEOUT = 600;
+	static final int DEFAULT_TIMEOUT = 500;
 	static final int DEFAULT_MAX_RETRIES = 5;
 	private static final int DEFAULT_BLOCK_SIZE = 8 * 1024;
 
@@ -152,6 +152,7 @@ public class FTP19Client {
 		DatagramPacket pckt;
 		long seqN = 1L;
 		boolean doneReading = false;
+		Timeout windowTimeout = new Timeout(DEFAULT_TIMEOUT, windowSize);
 
 		for (;;) {
 			try {
@@ -177,15 +178,12 @@ public class FTP19Client {
 				FTP19Packet ack = receiverQueue.poll();
 				
 				if(ack == null){
+					System.out.println(windowTimeout.getTimeout());
 					if(System.currentTimeMillis() - window.getSendTime() > timeout
 					/*&& window.getLastSSeq() != window.getLastCSeq() + window.getCurrentWindowSize() - 1 */){
 						System.out.println(ack);
-						System.out.println("[NULL] LAST CSEQ : " + window.getLastCSeq());
-						System.out.println("[NULL] LAST SSEQ : " + window.getLastSSeq());
 						window.setSSeq(0);
-						System.out.println("[NULL] LAST SSEQ : " + window.getLastSSeq());
 					}
-					
 				}
 				else{
 					ack.setPosition(2);
@@ -193,6 +191,12 @@ public class FTP19Client {
 					long spckN = ack.getLong();
 
 					System.out.println(ack);
+					
+					
+					long packetTimeout = System.currentTimeMillis() - window.getSendTime();
+
+					windowTimeout.packetReceived(packetTimeout + timeout);
+					stats.newRTTMeasure(packetTimeout);
 
 					for(;cpckN >= window.getLastCSeq(); window.removeHead());
 
