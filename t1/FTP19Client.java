@@ -28,7 +28,7 @@ public class FTP19Client {
 
 	static final int FTP19_PORT = 9000;
 
-	static final int DEFAULT_TIMEOUT = 500;
+	static final int DEFAULT_TIMEOUT = 100;
 	static final int DEFAULT_MAX_RETRIES = 5;
 	private static final int DEFAULT_BLOCK_SIZE = 8 * 1024;
 
@@ -163,7 +163,6 @@ public class FTP19Client {
 						pckt = buildDataPacket(seqN, 0L, buffer, n).toDatagram(srvAddress);
 						window.addPacket(pckt);
 						socket.send(pckt);
-						System.out.println("Sent new packet : " + seqN);
 						seqN++;
 						stats.newPacketSent(n);
 					}
@@ -179,7 +178,7 @@ public class FTP19Client {
 				
 				if(ack == null){
 					System.out.println(windowTimeout.getTimeout());
-					if(System.currentTimeMillis() - window.getSendTime() > timeout
+					if(System.currentTimeMillis() - window.getSendTime() > windowTimeout.getTimeout()
 					/*&& window.getLastSSeq() != window.getLastCSeq() + window.getCurrentWindowSize() - 1 */){
 						System.out.println(ack);
 						window.setSSeq(0);
@@ -195,17 +194,14 @@ public class FTP19Client {
 					
 					long packetTimeout = System.currentTimeMillis() - window.getSendTime();
 
-					windowTimeout.packetReceived(packetTimeout + timeout);
+					windowTimeout.packetReceived(packetTimeout + timeout, (spckN < 0 && Math.abs(spckN) < cpckN));
 					stats.newRTTMeasure(packetTimeout);
 
 					for(;cpckN >= window.getLastCSeq(); window.removeHead());
 
 					if(spckN > cpckN){
 							//if(spckN > window.getLastSSeq() + 1){
-								System.out.println("LAST SSEQ: " + window.getLastSSeq());
 								window.setSSeq(spckN);
-								System.out.println("INDEX: " + window.getCurrentIndex());
-								System.out.println("NEW SSEQ : " + window.getLastSSeq());
 
 							//}
 						}
@@ -214,7 +210,6 @@ public class FTP19Client {
 
 				if (window.getNumberOfPackets() != 0) {
 					while (window.getCurrentIndex() < (window.getLastSSeq() - window.getLastCSeq())) {						
-						System.out.println("Resent packet: " + (window.getLastCSeq() + window.getCurrentIndex()));
 						socket.send(window.getPacket());
 						window.incrementIndex();
 					}
