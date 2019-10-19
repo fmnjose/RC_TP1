@@ -41,7 +41,7 @@ public class SlidingWindow{
     public void setSSeq(long sseq){
        if (sseq == 0){
             this.index = 0;
-            this.lastSSeq = this.lastCSeq + this.windowSize;
+            this.lastSSeq = this.lastCSeq + this.sendingQueue.size();
         }
         else{
         if(this.lastSSeq == -1L)
@@ -59,7 +59,6 @@ public class SlidingWindow{
     }
 
     public void removeHead(){
-        System.out.println("Removed Head. LAST CSEQ: " + this.lastCSeq);
         this.sendingQueue.remove(0);
         this.sendingTimes.remove(0);
         lastCSeq++;
@@ -112,7 +111,6 @@ public class SlidingWindow{
         int i = 0;
 
         while(it.hasNext()){
-          System.out.println("WINDOW PACKET NUMBER: " + (lastCSeq + i++));
             it.next();
         }
     }

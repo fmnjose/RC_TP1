@@ -28,7 +28,7 @@ public class FTP19Client {
 
 	static final int FTP19_PORT = 9000;
 
-	static final int DEFAULT_TIMEOUT = 100;
+	static final int DEFAULT_TIMEOUT = 50;
 	static final int DEFAULT_MAX_RETRIES = 5;
 	private static final int DEFAULT_BLOCK_SIZE = 8 * 1024;
 
@@ -123,7 +123,7 @@ public class FTP19Client {
 	}
 
 	static void sendFile(String filename) throws Exception {
-		try (DatagramSocket socket = new lib.RCDatagramSocket(); // new DatagramSocket(); // for testing use
+		try (DatagramSocket socket = new DatagramSocket(); // for testing use
 																	// lib.RCDatagramSocket();
 				FileInputStream f = new FileInputStream(filename)) {
 			// for statistics
@@ -152,7 +152,7 @@ public class FTP19Client {
 		DatagramPacket pckt;
 		long seqN = 1L;
 		boolean doneReading = false;
-		Timeout windowTimeout = new Timeout(DEFAULT_TIMEOUT, windowSize);
+		Timeout windowTimeout = new Timeout(timeout, windowSize);
 
 		for (;;) {
 			try {
@@ -175,35 +175,26 @@ public class FTP19Client {
 				
 				
 				FTP19Packet ack = receiverQueue.poll();
-				
+
 				if(ack == null){
-					System.out.println(windowTimeout.getTimeout());
-					if(System.currentTimeMillis() - window.getSendTime() > windowTimeout.getTimeout()
-					/*&& window.getLastSSeq() != window.getLastCSeq() + window.getCurrentWindowSize() - 1 */){
-						System.out.println(ack);
+					if(System.currentTimeMillis() - window.getSendTime() > windowSize * windowTimeout.getTimeout())
 						window.setSSeq(0);
-					}
 				}
 				else{
 					ack.setPosition(2);
 					long cpckN = ack.getLong();
 					long spckN = ack.getLong();
-
-					System.out.println(ack);
 					
 					
 					long packetTimeout = System.currentTimeMillis() - window.getSendTime();
 
-					windowTimeout.packetReceived(packetTimeout + timeout, (spckN < 0 && Math.abs(spckN) < cpckN));
+					windowTimeout.packetReceived(packetTimeout, (spckN < 0 && Math.abs(spckN) < cpckN));
 					stats.newRTTMeasure(packetTimeout);
 
 					for(;cpckN >= window.getLastCSeq(); window.removeHead());
 
 					if(spckN > cpckN){
-							//if(spckN > window.getLastSSeq() + 1){
 								window.setSSeq(spckN);
-
-							//}
 						}
 
 				}
@@ -215,21 +206,19 @@ public class FTP19Client {
 					}
 				}else if(window.hasSpace() && doneReading && !done){
 					pckt = buildFinPacket(seqN).toDatagram(srvAddress);
-					
 					window.addPacket(pckt);
 					socket.send(pckt);
-					System.out.println("FIN packet has seqN " + seqN);
 					stats.newPacketSent(0);
 					
 					done = true;
-					
+					Thread.sleep(50);
 				}else if(doneReading)					
 					break;
 
 			} catch (IOException e) {
 				System.out.println(e.getStackTrace());
-			} catch (NullPointerException e){
-				System.out.println("pila");
+			} catch(InterruptedException e){
+				System.out.println("poopoo");
 			}
 		}
 
