@@ -6,13 +6,13 @@ import java.util.LinkedList;
 public class Timeout{
     long cTimeout, maxSize, defaultTimeout;
     LinkedList<Long> rtts;
-    
+    public static final int SAMPLING_SIZE = 5;
 
     public Timeout(long defaultTimeout, int windowSize){
         this.defaultTimeout = defaultTimeout;
         this.cTimeout = 0;
         this.rtts = new LinkedList<>();
-        this.maxSize = (int)(windowSize + 3);
+        this.maxSize = windowSize + SAMPLING_SIZE;
     }
 
     public void packetReceived(long rtt, boolean isNack){
