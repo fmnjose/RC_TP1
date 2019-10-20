@@ -1,5 +1,0 @@
-New server started at local port 9000
-window size: 5 blocks x 1024 = 5120 bytes
-receiving file: earth.jpg at socket: 64606
-earth.jpg DONE!
-

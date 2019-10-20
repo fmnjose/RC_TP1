@@ -1,6 +1,10 @@
 package t1;
 
 /**
+ * @author David Pereira - 52890 // Filipe Jose - 53277
+ */
+
+/**
  * FTP19Client Stop&Wait - File transfer protocol 2019 edition - RC FCT/UNL
  **/
 
@@ -11,14 +15,9 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
-import java.net.SocketTimeoutException;
-import java.util.Iterator;
-import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.Iterator;
 
 import lib.Stats;
 
@@ -31,7 +30,6 @@ public class FTP19Client {
 	static final int DEFAULT_TIMEOUT = 500;
 	static final int DEFAULT_MAX_RETRIES = 5;
 	private static final int DEFAULT_BLOCK_SIZE = 8 * 1024;
-	private static final int THRESHOLD = 50;
 
 	static int windowSize = 1; // this client is a stop and wait one
 	static int blockSize = DEFAULT_BLOCK_SIZE;
@@ -41,6 +39,7 @@ public class FTP19Client {
 	static SlidingWindow window;
 	static BlockingQueue<FTP19Packet> receiverQueue;
 	static SocketAddress srvAddress;
+	static long threshold;
 
 	static boolean done = false;
 
@@ -63,7 +62,7 @@ public class FTP19Client {
 				for (;;) {
 					byte[] buffer = new byte[MAX_FTP19_PACKET_SIZE];
 					DatagramPacket msg = new DatagramPacket(buffer, buffer.length);
-					if(done && window.getNumberOfPackets() == 1)
+					if(done && window.getNumberOfPackets() == 0)
 						break;
 					socket.receive(msg);
 					// update server address (it changes when the reply to UPLOAD
@@ -73,7 +72,6 @@ public class FTP19Client {
 					FTP19Packet pkt = new FTP19Packet(msg.getData(), msg.getLength());
 					receiverQueue.put(pkt);
 				}
-
 				System.out.println("Receiver done");
 
 			} catch (Exception e) {
@@ -99,6 +97,7 @@ public class FTP19Client {
 			if (ack != null)
 				if (ack.getShort() == ACK)
 					if (expectedACK == ack.getLong()) {
+						threshold = (System.currentTimeMillis() - sendTime);
 						stats.newRTTMeasure(System.currentTimeMillis() - sendTime); // RTT
 						return ack.getLong(); // return sseqN
 					} else
@@ -150,7 +149,7 @@ public class FTP19Client {
 		byte buffer[] = new byte[blockSize];
 		int n;
 		DatagramPacket pckt;
-		long seqN = 1L;
+		long seqN = 1L, packetTimeout;
 		boolean doneReading = false;
 
 		Timeout windowTimeout = new Timeout(timeout, windowSize);
@@ -171,21 +170,19 @@ public class FTP19Client {
 				}
 				FTP19Packet ack = receiverQueue.poll();
 				if(ack == null){
-					if(System.currentTimeMillis() - window.getSendTime() > windowSize * windowTimeout.getTimeout())
+					if(System.currentTimeMillis() - window.getSendTime() > windowTimeout.getTimeout())
 						window.setSSeq(0);
 				}
 				else{
 					ack.setPosition(2);
 					long cpckN = ack.getLong();
 					long spckN = ack.getLong();
-					long packetTimeout;
-
 					if(window.getLastCSeq() < windowSize + windowTimeout.SAMPLING_SIZE + 1)
 						packetTimeout = System.currentTimeMillis() - window.getSendTime() + timeout;
 					else
-						packetTimeout = System.currentTimeMillis() - window.getSendTime() + THRESHOLD;
-
+						packetTimeout = System.currentTimeMillis() - window.getSendTime() + threshold;
 					windowTimeout.packetReceived(packetTimeout, (spckN < 0 && Math.abs(spckN) < cpckN));
+					stats.newTimeout((int)windowTimeout.getTimeout());
 					System.out.println(packetTimeout);
 					stats.newRTTMeasure(packetTimeout);
 					for(;cpckN >= window.getLastCSeq(); window.removeHead());
@@ -205,7 +202,6 @@ public class FTP19Client {
 					done = true;
 				}else if(doneReading)					
 					break;
-
 			} catch (IOException e) {
 				System.out.println(e.getStackTrace());
 			}

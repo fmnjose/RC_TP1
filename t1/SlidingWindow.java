@@ -3,7 +3,6 @@ package t1;
 import java.util.LinkedList;
 import java.util.List;
 import java.net.DatagramPacket;
-import java.util.Iterator;
 
 public class SlidingWindow{
     private List<DatagramPacket> sendingQueue;
@@ -88,10 +87,7 @@ public class SlidingWindow{
     public int getCurrentWindowSize(){
         return windowSize;
     }
-    /**
-     * 
-     * @return Lowest packet number
-     */
+ 
     public long getLastCSeq(){
         return this.lastCSeq;
     }
@@ -99,10 +95,7 @@ public class SlidingWindow{
     public long getLastSSeq(){
         return this.lastSSeq;
     }
-    /**
-     *
-     * @return Number of packets in the window
-     */
+ 
     public int getNumberOfPackets(){
         return this.sendingQueue.size();
     }
@@ -113,16 +106,5 @@ public class SlidingWindow{
 
     public int getMaxIndex(){
 		return this.sendingQueue.size() - 1;
-    }
-
-
-    public void printWindow(){
-        Iterator it = sendingQueue.iterator();
-
-        int i = 0;
-
-        while(it.hasNext()){
-            it.next();
-        }
     }
 }
